@@ -1,4 +1,4 @@
-#define DEBUGGING
+//#define DEBUGGING
 //#define SUPPORT_HIXIE_76
 
 #include "global.h"
