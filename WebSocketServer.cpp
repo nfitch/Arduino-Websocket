@@ -1,4 +1,4 @@
-//#define DEBUGGING
+#define DEBUGGING
 //#define SUPPORT_HIXIE_76
 
 #include "global.h"
@@ -9,12 +9,20 @@
 #endif
 
 #include "sha1.h"
-#include "base64.h"
+#include "Base64.h"
 
+Client *WebSocketServer::getClient() {
+    return socket_client;
+}
+
+bool WebSocketServer::clientConnected() {
+    return (socket_client != NULL && !socket_disconnecting && socket_client->connected());
+}
 
 bool WebSocketServer::handshake(Client &client) {
 
     socket_client = &client;
+    socket_disconnecting = false;
 
     // If there is a connected client->
     if (socket_client->connected()) {
@@ -54,7 +62,7 @@ bool WebSocketServer::analyzeRequest(int bufferLength) {
     String newkey;
 
     hixie76style = false;
-    
+
 #ifdef DEBUGGING
     Serial.println(F("Analyzing request headers"));
 #endif
@@ -88,7 +96,7 @@ bool WebSocketServer::analyzeRequest(int bufferLength) {
             } else if (temp.startsWith("Sec-WebSocket-Key: ")) {
                 newkey=temp.substring(19,temp.length() - 2); // Don't save last CR+LF
             }
-            temp = "";		
+            temp = "";
         }
 
         if (!socket_client->available()) {
@@ -117,7 +125,7 @@ bool WebSocketServer::analyzeRequest(int bufferLength) {
             for (int i = 0; i <= 1; i++) {
                 unsigned int spaces =0;
                 String numbers;
-                
+
                 for (int c = 0; c < oldkey[i].length(); c++) {
                     char ac = oldkey[i].charAt(c);
                     if (ac >= '0' && ac <= '9') {
@@ -129,38 +137,38 @@ bool WebSocketServer::analyzeRequest(int bufferLength) {
                 }
                 char numberschar[numbers.length() + 1];
                 numbers.toCharArray(numberschar, numbers.length()+1);
-                intkey[i] = strtoul(numberschar, NULL, 10) / spaces;		
+                intkey[i] = strtoul(numberschar, NULL, 10) / spaces;
             }
-            
+
             unsigned char challenge[16] = {0};
             challenge[0] = (unsigned char) ((intkey[0] >> 24) & 0xFF);
             challenge[1] = (unsigned char) ((intkey[0] >> 16) & 0xFF);
             challenge[2] = (unsigned char) ((intkey[0] >>  8) & 0xFF);
-            challenge[3] = (unsigned char) ((intkey[0]      ) & 0xFF);	
+            challenge[3] = (unsigned char) ((intkey[0]      ) & 0xFF);
             challenge[4] = (unsigned char) ((intkey[1] >> 24) & 0xFF);
             challenge[5] = (unsigned char) ((intkey[1] >> 16) & 0xFF);
             challenge[6] = (unsigned char) ((intkey[1] >>  8) & 0xFF);
             challenge[7] = (unsigned char) ((intkey[1]      ) & 0xFF);
-            
+
             memcpy(challenge + 8, key3, 8);
-            
+
             unsigned char md5Digest[16];
             MD5(challenge, md5Digest, 16);
-            
+
             socket_client->print(F("HTTP/1.1 101 Web Socket Protocol Handshake\r\n"));
             socket_client->print(F("Upgrade: WebSocket\r\n"));
             socket_client->print(F("Connection: Upgrade\r\n"));
-            socket_client->print(F("Sec-WebSocket-Origin: "));        
+            socket_client->print(F("Sec-WebSocket-Origin: "));
             socket_client->print(origin);
             socket_client->print(CRLF);
-            
+
             // The "Host:" value should be used as location
             socket_client->print(F("Sec-WebSocket-Location: ws://"));
             socket_client->print(host);
             socket_client->print(socket_urlPrefix);
             socket_client->print(CRLF);
             socket_client->print(CRLF);
-            
+
             socket_client->write(md5Digest, 16);
 
             return true;
@@ -226,10 +234,10 @@ String WebSocketServer::handleHixie76Stream() {
             if ((uint8_t) bite == 0xFF) {
                 // Frame end. Process what we got.
                 return socketString;
-                
+
             } else {
                 socketString += (char)bite;
-                frameLength++;            
+                frameLength++;
 
                 if (frameLength > MAX_FRAME_LENGTH) {
                     // Too big to handle!
@@ -239,8 +247,8 @@ String WebSocketServer::handleHixie76Stream() {
                     Serial.println(" bytes");
 #endif
                     return;
-                }  
-            }           
+                }
+            }
         }
     }
 
@@ -279,11 +287,11 @@ String WebSocketServer::handleStream() {
             if (!socket_client->connected()) {
                 return socketString;
             }
-            
+
             length |= timedRead();
             if (!socket_client->connected()) {
                 return socketString;
-            }   
+            }
 
         } else if (length == 127) {
 #ifdef DEBUGGING
@@ -328,6 +336,7 @@ String WebSocketServer::handleStream() {
 }
 
 void WebSocketServer::disconnectStream() {
+    socket_disconnecting = true;
 #ifdef DEBUGGING
     Serial.println(F("Terminating socket"));
 #endif
@@ -336,15 +345,15 @@ void WebSocketServer::disconnectStream() {
 #ifdef SUPPORT_HIXIE_76
         // Should send 0xFF00 to server to tell it I'm quitting here.
         socket_client->write((uint8_t) 0xFF);
-        socket_client->write((uint8_t) 0x00); 
-#endif       
+        socket_client->write((uint8_t) 0x00);
+#endif
     } else {
 
         // Should send 0x8700 to server to tell it I'm quitting here.
         socket_client->write((uint8_t) 0x87);
         socket_client->write((uint8_t) 0x00);
-    }   
-    
+    }
+
     socket_client->flush();
     delay(10);
     socket_client->stop();
@@ -373,10 +382,10 @@ void WebSocketServer::sendData(const char *str) {
         if (hixie76style) {
             socket_client->write(0x00); // Frame start
             socket_client->print(str);
-            socket_client->write(0xFF); // Frame end            
+            socket_client->write(0xFF); // Frame end
         } else {
             sendEncodedData(str);
-        }         
+        }
     }
 }
 
@@ -389,7 +398,7 @@ void WebSocketServer::sendData(String str) {
         if (hixie76style) {
             socket_client->write(0x00); // Frame start
             socket_client->print(str);
-            socket_client->write(0xFF); // Frame end        
+            socket_client->write(0xFF); // Frame end
         } else {
             sendEncodedData(str);
         }
@@ -398,7 +407,7 @@ void WebSocketServer::sendData(String str) {
 
 int WebSocketServer::timedRead() {
   while (!socket_client->available()) {
-    delay(20);  
+    delay(20);
   }
 
   return socket_client->read();

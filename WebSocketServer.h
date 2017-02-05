@@ -45,19 +45,19 @@ http://tools.ietf.org/html/draft-hixie-thewebsocketprotocol-75
 
 #include <Arduino.h>
 #include <Stream.h>
-#include "String.h"
+//#include "String.h"
 #include "Server.h"
 #include "Client.h"
 
 // CRLF characters to terminate lines/handshakes in headers.
 #define CRLF "\r\n"
 
-// Amount of time (in ms) a user may be connected before getting disconnected 
+// Amount of time (in ms) a user may be connected before getting disconnected
 // for timing out (i.e. not sending any data to the server).
 #define TIMEOUT_IN_MS 10000
 #define BUFFER_LENGTH 32
 
-// ACTION_SPACE is how many actions are allowed in a program. Defaults to 
+// ACTION_SPACE is how many actions are allowed in a program. Defaults to
 // 5 unless overwritten by user.
 #ifndef CALLBACK_FUNCTIONS
 #define CALLBACK_FUNCTIONS 1
@@ -77,7 +77,11 @@ public:
     // Handle connection requests to validate and process/refuse
     // connections.
     bool handshake(Client &client);
-    
+
+    // Check Client Status
+    bool clientConnected();
+    Client *getClient();
+
     // Get data off of the stream
     String getData();
 
@@ -87,6 +91,7 @@ public:
 
 private:
     Client *socket_client;
+    bool socket_disconnecting;
     unsigned long _startMillis;
 
     const char *socket_urlPrefix;
@@ -102,11 +107,11 @@ private:
 #ifdef SUPPORT_HIXIE_76
     String handleHixie76Stream();
 #endif
-    String handleStream();    
-    
+    String handleStream();
+
     // Disconnect user gracefully.
     void disconnectStream();
-    
+
     int timedRead();
 
     void sendEncodedData(char *str);
